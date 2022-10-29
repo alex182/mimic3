@@ -55,7 +55,6 @@ RUN --mount=type=cache,id=pip-requirements,target=/root/.cache/pip \
 
 # Copy default voice
 COPY voices/ /home/alex/.local/share/mycroft/mimic3/voices/
-RUN .venv/bin/mimic3-download --debug 'en_UK/apope_low'
 
 RUN useradd -ms /bin/bash mimic3
 
