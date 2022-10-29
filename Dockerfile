@@ -22,7 +22,7 @@
 # Requires Docker buildx: https://docs.docker.com/buildx/working-with-buildx/
 # -----------------------------------------------------------------------------
 
-FROM debian:bullseye as build
+FROM nvcr.io/nvidia/cuda:11.4.2-cudnn8-devel-ubuntu20.04
 ARG TARGETARCH
 ARG TARGETVARIANT
 
@@ -31,21 +31,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN echo "Dir::Cache var/cache/apt/${TARGETARCH}${TARGETVARIANT};" > /etc/apt/apt.conf.d/01cache
 
-COPY debian/control.in.* ./debian/
-
-# Use dependencies from Debian package control file
-RUN --mount=type=cache,id=apt-build,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-run,target=/var/cache/apt \
     mkdir -p /var/cache/apt/${TARGETARCH}${TARGETVARIANT}/archives/partial && \
     apt-get update && \
-    grep 'Depends:' "debian/control.in.${TARGETARCH}${TARGETVARIANT}" | cut -d' ' -f2- | sed -e 's/,/\n/g' | \
-    xargs apt-get install --yes --no-install-recommends \
+    apt-get install --yes --no-install-recommends \
         python3 python3-pip python3-venv \
-        build-essential python3-dev
-
+        ca-certificates libespeak-ng1
 
 WORKDIR /home/mimic3/app
-
-COPY wheels/ ./wheels/
 
 COPY opentts_abc/ ./opentts_abc/
 COPY mimic3_http/ ./mimic3_http/
@@ -53,59 +46,21 @@ COPY mimic3_tts/ ./mimic3_tts/
 COPY LICENSE MANIFEST.in README.md setup.py requirements.txt ./
 COPY install.sh ./
 
+# Use GPU version of onnxruntime
+RUN sed -i 's/onnxruntime/onnxruntime-gpu/' ./requirements.txt
+
 # Install mimic3
 RUN --mount=type=cache,id=pip-requirements,target=/root/.cache/pip \
     ./install.sh
 
-# Download default voice
-COPY voices/ /root/.local/share/mycroft/mimic3/voices/
-RUN .venv/bin/mimic3-download --debug 'en_UK/apope_low'
-
-# -----------------------------------------------------------------------------
-
-FROM debian:bullseye as run
-ARG TARGETARCH
-ARG TARGETVARIANT
-
-ENV LANG C.UTF-8
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN echo "Dir::Cache var/cache/apt/${TARGETARCH}${TARGETVARIANT};" > /etc/apt/apt.conf.d/01cache
-
-WORKDIR /home/mimic3/app
-
-COPY debian/control.in.* ./debian/
-
-# Use dependencies from Debian package control file
-RUN --mount=type=cache,id=apt-run,target=/var/cache/apt \
-    mkdir -p /var/cache/apt/${TARGETARCH}${TARGETVARIANT}/archives/partial && \
-    apt-get update && \
-    grep 'Depends:' "debian/control.in.${TARGETARCH}${TARGETVARIANT}" | cut -d' ' -f2- | sed -e 's/,/\n/g' | \
-    xargs apt-get install --yes --no-install-recommends \
-        python3 ca-certificates
+# Copy default voice
+COPY voices/ /usr/local/share/mycroft/mimic3/voices/
 
 RUN useradd -ms /bin/bash mimic3
 
-# Copy virtual environment and source code
-COPY --from=build /home/mimic3/app/ ./
-
-# Copy pre-downloaded voice(s)
-COPY --from=build /root/.local/share/mycroft/mimic3/voices/ /usr/share/mycroft/mimic3/voices/
-
-# Run test
-COPY tests/* ./tests/
-
-# Generate sample and check
-RUN export expected_sample="tests/apope_sample_${TARGETARCH}${TARGETVARIANT}.wav" && \
-    .venv/bin/mimic3 \
-    --deterministic \
-    --voice 'en_UK/apope_low' \
-    < tests/apope_sample.txt \
-    > tests/actual_sample.wav && \
-    tests/samples_match.py tests/actual_sample.wav "${expected_sample}"
-
 USER mimic3
+WORKDIR /home/mimic3/app
 
 EXPOSE 59125
 
-ENTRYPOINT ["/home/mimic3/app/.venv/bin/python3", "-m", "mimic3_http"]
+ENTRYPOINT ["/home/mimic3/app/.venv/bin/python3", "-m", "mimic3_http", "--cuda"]
