@@ -266,7 +266,8 @@ def get_app(args: argparse.Namespace, request_queue: Queue, temp_dir: str):
             sample_text = SAMPLE_SENTENCES.get(short_lang, "")
             sample_text = re.sub(r"\s+", " ", sample_text)
             voice_dict["sample_text"] = sample_text
-
+            print("00000000====voice_dicts0000----=")
+            print(str(voice_dicts)
         return jsonify(voice_dicts)
 
     @app.route("/process", methods=["GET", "POST"])
