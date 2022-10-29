@@ -31,6 +31,7 @@ except (ImportError, AttributeError):
 
 _PACKAGE = "mimic3_tts"
 _DIR = Path(typing.cast(os.PathLike, files(_PACKAGE)))
+print(f"-------------------{str(_DIR)}-------------")
 
 __version__ = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
 
