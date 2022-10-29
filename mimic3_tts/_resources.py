@@ -50,3 +50,4 @@ __version__ = (_DIR / "VERSION").read_text(encoding="utf-8").strip()
 # }
 with open(_DIR / "voices.json", "r", encoding="utf-8") as voices_file:
     _VOICES = json.load(voices_file)
+    print(_VOICES)
