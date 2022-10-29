@@ -542,9 +542,10 @@ def get_remote_voices(state: CommandLineInterfaceState) -> typing.List:
 
     url = f"{args.remote}/api/voices"
     _LOGGER.debug("Getting voices from remote server at %s", url)
-
+    print("-----getting voices----")
     voices_json = requests.get(url).json()
-
+    print("-----voices!")
+    print(str(voices_json))
     return [Voice(**voice_args) for voice_args in voices_json]
 
 
